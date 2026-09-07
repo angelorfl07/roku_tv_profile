@@ -176,9 +176,23 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
       demonstração) — truque sem precisar do app Android ainda: no seletor
       de "player externo" do Stremio, escolher o Chrome; a URL aparece na
       barra de endereço e pode ser copiada de lá pro `send_to_roku.sh`.
+- [~] Testado com stream real do Stremio (IPTV Xtream, 2026-09-07): a URL
+      chegou no canal, mas deu `ERRO[-5] malformed data` no `pos=0`. Causa:
+      o canal mandava `streamFormat="mp4"` pra tudo que não fosse `.m3u8`, e
+      o release era Matroska real (`.mkv`, `video/x-matroska`, H.264 720p +
+      E-AC3 — ambos suportados pela Roku Express 3960BR; só o container estava
+      declarado errado). Corrigido no `build_version=2`: detecção de
+      `streamFormat` por extensão (`.mkv/.mka→mkv`, `.mpd→dash`, `.ts→ts`,
+      `.m3u8→hls`, senão `mp4`) + fallback automático `mkv↔mp4` se o primeiro
+      falhar no load. **Falta reconfirmar o playback com o canal v2.**
+      Nota: a URL do Stremio (`play.dnshtp.com`) responde **302** para um
+      `http://<ip>:<porta>` cru — a Roku OS 15.x segue esse redirect em
+      playback progressivo sem problema (o destino serve `Accept-Ranges` +
+      `Content-Type` corretos); se algum stream futuro falhar só por causa de
+      redirect, aí sim resolver o `Location` num Task node antes de tocar.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
-- [ ] Testar compatibilidade de formato: HEVC/H.264, containers MKV, HLS.
+- [ ] Testar mais formatos: HEVC, HLS (`.m3u8`), DASH.
 - [x] Compilar o `android-bridge/` — CI em `.github/workflows/build-apk.yml`
       gera o `app-debug.apk` a cada push que mexe em `android-bridge/`.
 - [ ] **Sideload do canal na Roku de produção (Roku Express 3960BR, "Roku Casa",
