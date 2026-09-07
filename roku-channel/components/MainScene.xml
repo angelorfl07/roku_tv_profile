@@ -8,17 +8,62 @@
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 
     <children>
-        <Label id="statusLabel"
-               text="Aguardando o Stremio no celular..."
-               translation="[120,340]"
-               width="1040"
-               color="0xCCCCCCFF" />
-        <Label id="debugLabel"
+        <Rectangle id="bg" translation="[0,0]" width="1280" height="720" color="0x14141EFF" />
+
+        <Group id="idleScreen">
+            <Poster id="appIcon"
+                    uri="pkg:/images/logo_idle.png"
+                    translation="[490,70]"
+                    width="300"
+                    height="300" />
+
+            <Label id="welcomeLabel"
+                   text="Bem-vindo"
+                   translation="[0,390]"
+                   width="1280"
+                   horizAlign="center"
+                   color="0xFFFFFFFF">
+                <Font role="font" size="56" />
+            </Label>
+
+            <Label id="subtitleLabel"
+                   text="Assista aqui seus vídeos do Stremio"
+                   translation="[0,450]"
+                   width="1280"
+                   horizAlign="center"
+                   color="0x9BB8FFFF">
+                <Font role="font" size="34" />
+            </Label>
+
+            <Label id="statusLabel"
+                   text="Aguardando o Stremio no celular..."
+                   translation="[0,500]"
+                   width="1280"
+                   horizAlign="center"
+                   color="0x8A8A96FF">
+                <Font role="font" size="24" />
+            </Label>
+        </Group>
+
+        <!-- DEBUG temporário — remover depois que o playback estiver confirmado.
+             Fica no topo, dentro da área segura de exibição, pra não cortar na TV. -->
+        <Label id="debugUrlLabel"
                text=""
-               translation="[40,620]"
+               translation="[40,30]"
                width="1200"
                wrap="true"
-               color="0x88CCFFFF" />
+               color="0x88CCFFFF">
+            <Font role="font" size="20" />
+        </Label>
+        <Label id="debugStateLabel"
+               text=""
+               translation="[40,110]"
+               width="1200"
+               wrap="true"
+               color="0xFFCC88FF">
+            <Font role="font" size="20" />
+        </Label>
+
         <Video id="videoPlayer"
                translation="[0,0]"
                width="1280"

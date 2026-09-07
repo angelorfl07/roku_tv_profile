@@ -2,8 +2,10 @@ sub init()
     m.top.setFocus(true)
 
     m.video = m.top.findNode("videoPlayer")
+    m.idleScreen = m.top.findNode("idleScreen")
     m.status = m.top.findNode("statusLabel")
-    m.debug = m.top.findNode("debugLabel")
+    m.debugUrl = m.top.findNode("debugUrlLabel")
+    m.debugState = m.top.findNode("debugStateLabel")
 
     m.video.enableTrickPlay = true
     m.video.notificationInterval = 1
@@ -17,10 +19,11 @@ sub onNewUrl()
     ' DEBUG: mostra na tela exatamente o que o canal recebeu, pra facilitar
     ' diagnóstico enquanto testamos (remover depois que estiver tudo ok).
     if url = ""
-        m.debug.text = "[debug] URL recebida: (vazia)"
+        m.debugUrl.text = "[debug] URL recebida: (vazia)"
     else
-        m.debug.text = "[debug] URL recebida (" + str(len(url)).trim() + " chars): " + url
+        m.debugUrl.text = "[debug] URL recebida (" + str(len(url)).trim() + " chars): " + url
     end if
+    m.debugState.text = ""
 
     if url <> ""
         playUrl(url, m.top.stremioTitle)
@@ -28,7 +31,7 @@ sub onNewUrl()
 end sub
 
 sub playUrl(url as String, title as String)
-    m.status.visible = false
+    m.idleScreen.visible = false
 
     content = createObject("roSGNode", "ContentNode")
     content.url = url
@@ -56,15 +59,16 @@ end function
 sub onVideoStateChange()
     state = m.video.state
 
-    ' DEBUG: acrescenta o estado/posição/erro reportado pelo Video node —
-    ' ajuda a diferenciar "nunca conseguiu abrir a URL" de "abriu e travou".
-    m.debug.text = m.debug.text + chr(10) + "[debug] estado: " + state +
+    ' DEBUG: mostra o último estado reportado pelo Video node (sobrescreve,
+    ' não acumula, pra não sair da área visível da tela).
+    line = "[debug] estado: " + state +
         " | posição: " + str(m.video.position).trim() +
         " | duração: " + str(m.video.duration).trim()
     if state = "error"
-        m.debug.text = m.debug.text + " | errorCode: " + str(m.video.errorCode).trim() +
+        line = line + " | errorCode: " + str(m.video.errorCode).trim() +
             " | errorMsg: " + m.video.errorMsg
     end if
+    m.debugState.text = line
 
     if state = "finished" or state = "error"
         errMsg = ""
@@ -72,7 +76,7 @@ sub onVideoStateChange()
             errMsg = " Verifique se o formato do stream é compatível com a Roku."
         end if
         m.status.text = "Playback encerrado." + errMsg + " Envie outro stream pelo celular."
-        m.status.visible = true
+        m.idleScreen.visible = true
         m.video.visible = false
     end if
 end sub
