@@ -190,26 +190,45 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
       playback progressivo sem problema (o destino serve `Accept-Ranges` +
       `Content-Type` corretos); se algum stream futuro falhar só por causa de
       redirect, aí sim resolver o `Location` num Task node antes de tocar.
-- [x] `build_version=3`: pause/seek + retomar. O vídeo tocava mas (a) o botão
-      play/pause do controle não pausava — o Video node não estava com foco
-      após o load do MKV progressivo (Roku às vezes não liga o trick play
-      nativo pra MKV); resolvido reassumindo `setFocus(true)` no estado
-      `playing` + handlers de tecla no `onKeyEvent` (REW/FF 30s com clamp,
-      VOLTAR pausa/2x sai). (b) sair do canal recomeçava do zero; agora a
-      posição é salva no `roRegistrySection "resume"` a cada ~5s com a URL, e
-      recastar o MESMO stream continua de onde parou (`content.playStart`).
-- [x] Áudio: release só tinha faixas **E-AC3 (Dolby Digital Plus)**, e a Roku
-      Express 3960BR **não decodifica Dolby** (só pass-through). Sem som até
-      pôr *Configurações > Áudio > Modo de áudio = **Estéreo*** (força o
-      downmix). Formato preferencial de streaming: **Dolby (auto)**, nunca
-      DTS — nenhuma Roku Express decodifica DTS. Releases só-DTS ou só-DD+ em
-      Roku básica dependem da TV decodificar o bitstream; o caminho robusto é
-      escolher no Stremio um release com **AAC/AC3 estéreo**.
+- [!] `build_version=3` **não instalou**: `Compilation Failed. MainScene` —
+      eu tinha posto os símbolos `▶`/`❚` (U+25B6/U+275A) em strings do `.brs`.
+      O compilador BrightScript da Roku aceita acento latino em string, mas
+      **não** esses dingbats. **Lição: `.brs` só ASCII em string literal.**
+      Corrigido; `.brs` e `.xml` do canal são 100% ASCII a partir da v4
+      (conferido com script no repo).
+- [x] `build_version=4`: duas frentes investigadas por agente (áudio / seek),
+      integradas.
+  - **Áudio — limitação de hardware, sem fix no canal.** A Roku Express 3960
+      (`is-tv=false`) **não tem decoder de Dolby (AC3/E-AC3) nem DTS** — só
+      pass-through do bitstream pra TV (doc Roku: decode-para-PCM-estéreo só
+      em Roku TV / Roku 4 / Roku Ultra). O release testado só tinha 2 faixas
+      **E-AC3**, nenhuma AAC/estéreo (a Roku recomenda todo conteúdo ter uma
+      faixa AAC de fallback — esse não tem). Pôr a Roku em "Estéreo" não
+      resolve: ela não tem com o que decodificar. `availableAudioTracks`
+      costuma vir **vazio** em MKV progressivo, então nem seleção de faixa
+      pelo canal funciona. Canal agora só faz `logAudioDiag()` (mostra
+      `audioFormat`+faixas na tela) + aviso "SEM SOM? use release AAC/AC3 ou
+      espelhe" + `tryPickStereoTrack()` p/ releases dual-audio. **Fix real:
+      escolher no Stremio um release com AAC/AC3 estéreo; ou TV com saída
+      PCM + DSPs desligados; ou soundbar que decodifica DD+; ou Miracast.**
+  - **Seek em MKV progressivo — limitação de plataforma.** Roku não tem
+      trick play confiável fora de HLS/DASH (RMP/progressive). Pause funciona;
+      pular não. `enableTrickPlay` agora **`false`** — com ele `true` o Video
+      node consumia `rewind`/`fastforward`/`play` antes do `onKeyEvent` e os
+      handlers manuais eram código morto. A Scene assume todo o transporte:
+      `OK` pausa/continua (o Video node **não** pausa no `OK` nativamente, só
+      no `play`), `<< >>` tentam `seek` ±30s, e `onPosition` detecta quando a
+      posição não converge no alvo em ~6s → avisa "stream não permite seek,
+      use HLS/debrid". Transporte só aceito em `playing`/`paused`.
+      `content.playStart` (retomar) tem a mesma fragilidade: se o host IPTV
+      ignora `Range`, volta pro início. **Fix real p/ seek: usar fontes HLS
+      (`.m3u8`) ou debrid no Stremio, não MKV puro de painel Xtream.**
+- [ ] Testar `.m3u8` / debrid: seek, resume e (talvez) áudio estéreo devem
+      passar a funcionar. Testar o `.m3u8` do mesmo título no painel Xtream
+      (`.../<id>.m3u8` em vez de `.mkv`), se existir.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
-- [ ] Testar mais formatos: HEVC, HLS (`.m3u8`), DASH. Confirmar se o seek
-      funciona de fato no MKV progressivo desta Roku (trick play de MKV é
-      historicamente limitado; pode não pegar sem índice Cues no começo).
+- [ ] Testar HEVC.
 - [x] Compilar o `android-bridge/` — CI em `.github/workflows/build-apk.yml`
       gera o `app-debug.apk` a cada push que mexe em `android-bridge/`.
 - [ ] **Sideload do canal na Roku de produção (Roku Express 3960BR, "Roku Casa",
