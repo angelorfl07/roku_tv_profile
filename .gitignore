@@ -9,5 +9,8 @@ android-bridge/*.iml
 
 # Roku packaging output
 stremio-cast-receiver.zip
+roku-channel/out/
+roku-channel/.roku-deploy-staging/
+node_modules/
 
 .DS_Store

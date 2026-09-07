@@ -190,12 +190,18 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
       playback progressivo sem problema (o destino serve `Accept-Ranges` +
       `Content-Type` corretos); se algum stream futuro falhar só por causa de
       redirect, aí sim resolver o `Location` num Task node antes de tocar.
-- [!] `build_version=3` **não instalou**: `Compilation Failed. MainScene` —
-      eu tinha posto os símbolos `▶`/`❚` (U+25B6/U+275A) em strings do `.brs`.
-      O compilador BrightScript da Roku aceita acento latino em string, mas
-      **não** esses dingbats. **Lição: `.brs` só ASCII em string literal.**
-      Corrigido; `.brs` e `.xml` do canal são 100% ASCII a partir da v4
-      (conferido com script no repo).
+- [!] `build_version=3`/`4` **não instalaram**: `Compilation Failed. MainScene`
+      (a Roku não dá número de linha). Causa real: usei **`pos`** como nome de
+      variável em `onPosition()` — **`pos` é builtin reservado** em BrightScript
+      (a função `Pos()`). Renomeado pra `curPos` (a CHAVE do registro continua
+      `"pos"`, string, sem problema). Achado rodando **`brighterscript`** local
+      (`npx brighterscript`, config em `roku-channel/bsconfig.json`) — agora o
+      `scripts/package_channel.sh` roda essa validação e **aborta** se houver
+      erro, antes de gerar o zip. **Lição: validar com brighterscript antes de
+      todo sideload; e cuidado com builtins reservados (`pos`, `line`, `tab`,
+      `type`, `run`, `box`, `str`, `val`, `chr`, `asc`, ...) como identificador.**
+      (A hipótese anterior de que era Unicode `▶`/`❚` nas strings estava errada
+      — mesmo assim mantive tudo ASCII no `.brs`, sem custo.)
 - [x] `build_version=4`: duas frentes investigadas por agente (áudio / seek),
       integradas.
   - **Áudio — limitação de hardware, sem fix no canal.** A Roku Express 3960

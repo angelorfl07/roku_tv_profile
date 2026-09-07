@@ -132,12 +132,12 @@ function hasExt(url as String, ext as String) as Boolean
 end function
 
 sub onPosition()
-    pos = m.video.position
-    if pos <= 0 then return
+    curPos = m.video.position
+    if curPos <= 0 then return
 
     ' Detector de seek morto: o host ignora Range / MKV sem indice no comeco.
     if m.seekTarget >= 0
-        if abs(pos - m.seekTarget) <= 3
+        if abs(curPos - m.seekTarget) <= 3
             m.seekTarget = -1
             m.hint.text = m.baseHint
         else if m.seekTimer <> invalid and m.seekTimer.totalSeconds() > 6
@@ -147,10 +147,10 @@ sub onPosition()
     end if
 
     ' Salva posicao a cada ~5s pra permitir retomar depois.
-    if pos - m.lastSavedPos < 5 and pos > m.lastSavedPos then return
-    m.lastSavedPos = pos
+    if curPos - m.lastSavedPos < 5 and curPos > m.lastSavedPos then return
+    m.lastSavedPos = curPos
     m.reg.Write("url", m.currentUrl)
-    m.reg.Write("pos", str(pos).trim())
+    m.reg.Write("pos", str(curPos).trim())
     m.reg.Flush()
     logAudioDiag()
 end sub
