@@ -10,7 +10,10 @@
         android:allowBackup="true"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.RokuCastBridge">
+        android:theme="@style/Theme.RokuCastBridge"
+        android:usesCleartextTraffic="true"><!-- ECP da Roku é HTTP puro (porta
+        8060) numa LAN; sem isto, targetSdk >= 28 bloqueia toda chamada http://
+        de dentro do app (o navegador do celular não é afetado). -->
 
         <activity
             android:name=".MainActivity"

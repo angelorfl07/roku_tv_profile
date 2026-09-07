@@ -125,10 +125,22 @@ stream (`MainActivity.ensureRokuReady`):
 Botão **"Esquecer IP"** limpa o valor salvo (para trocar de Roku de propósito).
 
 Todas as chamadas (ECP e SSDP) são forçadas pela rede Wi-Fi/Ethernet
-(`LocalNetwork.of` → `Network.openConnection` / `Network.bindSocket`). Sem isso,
-com dados móveis (4G/5G) ligados o Android roteava o socket pela operadora e a
-Roku ficava inalcançável — era a causa do `input=-1, launch=-1` visto em teste
-(o print mostrava 5G ativo junto com o Wi-Fi).
+(`LocalNetwork.of` → `Network.openConnection` / `Network.bindSocket`), com
+fallback pela rota padrão do sistema. Isso evita o Android rotear o socket
+pela operadora quando os dados móveis (4G/5G) estão ligados junto com o Wi-Fi.
+
+### ⚠️ Causa real do "não consegui falar com a Roku" (resolvido na v1.4)
+
+O sintoma (`input=-1, launch=-1`, depois "porta 8060 não respondeu ao teste")
+**não era rede nem 5G** — era **cleartext HTTP bloqueado dentro do app**. Com
+`targetSdk >= 28`, o Android proíbe por padrão qualquer requisição `http://`
+(sem TLS) feita pelo app; toda chamada ao ECP da Roku (`http://<ip>:8060/...`)
+estourava exceção antes de sair. O navegador do próprio celular acessava a
+mesma URL normalmente porque não está sujeito à policy do app — foi o que
+despistou o diagnóstico. Corrigido com `android:usesCleartextTraffic="true"`
+no `<application>` do `AndroidManifest.xml`. As mudanças de bind de rede /
+health check / SSDP das v1.1–v1.3 continuam válidas, mas nenhuma delas
+resolvia isto sozinha.
 
 ## Fallback sem escrever nada: Miracast nativo da Roku
 
