@@ -12,6 +12,10 @@ sub init()
     m.video.observeField("state", "onVideoStateChange")
 
     m.stateLog = []
+    m.formatsToTry = []
+    m.currentFormat = ""
+    m.currentUrl = ""
+    m.currentTitle = ""
 end sub
 
 ' disparado automaticamente quando main.brs seta scene.stremioUrl
@@ -35,20 +39,46 @@ end sub
 
 sub playUrl(url as String, title as String)
     m.idleScreen.visible = false
+    m.currentUrl = url
+    m.currentTitle = title
 
-    content = createObject("roSGNode", "ContentNode")
-    content.url = url
-    content.title = title
-
-    ' "hls" para links .m3u8 (comum com resolvers/debrid), "mp4" cobre mp4/mkv na maioria
-    ' dos modelos Roku. Se o stream não tocar, o formato costuma ser a primeira coisa a
-    ' checar (ver observações de compatibilidade no CLAUDE.md do projeto).
+    ' Ordem de formatos a tentar. A Roku NÃO detecta container sozinha em
+    ' playback progressivo — passar o streamFormat errado dá "malformed data"
+    ' logo no pos=0 (ex.: "mp4" num Matroska real: o demuxer bate no header
+    ' EBML e rejeita). Então detectamos pela extensão e, se o primeiro
+    ' formato falhar de cara, tentamos o outro automaticamente.
     if isHls(url)
-        content.streamFormat = "hls"
+        m.formatsToTry = ["hls"]
+    else if hasExt(url, ".mpd")
+        m.formatsToTry = ["dash"]
+    else if hasExt(url, ".mkv") or hasExt(url, ".mka")
+        m.formatsToTry = ["mkv", "mp4"]
+    else if hasExt(url, ".ts")
+        m.formatsToTry = ["ts", "mp4"]
+    else if hasExt(url, ".mp3")
+        m.formatsToTry = ["mp3"]
     else
-        content.streamFormat = "mp4"
+        ' mp4 / m4v / mov / desconhecido — mp4 primeiro, mkv como rede de segurança
+        m.formatsToTry = ["mp4", "mkv"]
     end if
 
+    startNextAttempt()
+end sub
+
+sub startNextAttempt()
+    if m.formatsToTry = invalid or m.formatsToTry.count() = 0 then return
+
+    fmt = m.formatsToTry.shift()
+    m.currentFormat = fmt
+
+    content = createObject("roSGNode", "ContentNode")
+    content.url = m.currentUrl
+    content.title = m.currentTitle
+    content.streamFormat = fmt
+
+    m.debugUrl.text = "[debug] fmt=" + fmt + " (" + str(len(m.currentUrl)).trim() + " chars): " + m.currentUrl
+
+    m.video.control = "stop"
     m.video.content = content
     m.video.visible = true
     m.video.control = "play"
@@ -59,6 +89,17 @@ function isHls(url as String) as Boolean
     return instr(1, lcase(url), ".m3u8") > 0
 end function
 
+' Confere a extensão do path ignorando querystring (?a=b) e fragmento (#x).
+function hasExt(url as String, ext as String) as Boolean
+    u = lcase(url)
+    q = instr(1, u, "?")
+    if q > 0 then u = left(u, q - 1)
+    h = instr(1, u, "#")
+    if h > 0 then u = left(u, h - 1)
+    if len(u) < len(ext) then return false
+    return right(u, len(ext)) = lcase(ext)
+end function
+
 sub onVideoStateChange()
     state = m.video.state
 
@@ -67,7 +108,7 @@ sub onVideoStateChange()
     ' preenche esses campos mesmo quando o estado "grosso" não é literalmente
     ' "error" (ex.: cai direto pra "finished" com duração 0 numa falha de load).
     line = state + " (pos=" + str(m.video.position).trim() +
-        " dur=" + str(m.video.duration).trim() + ")"
+        " dur=" + str(m.video.duration).trim() + " fmt=" + m.currentFormat + ")"
 
     errCode = m.video.errorCode
     errMsg = m.video.errorMsg
@@ -87,12 +128,25 @@ sub onVideoStateChange()
     end for
     m.debugState.text = full
 
-    if state = "finished" or state = "error"
-        errMsg = ""
-        if state = "error"
-            errMsg = " Verifique se o formato do stream é compatível com a Roku."
+    ' Falha de carregamento: "error", ou "finished" sem nunca ter tido duração.
+    isLoadFailure = (state = "error") or (state = "finished" and m.video.duration = 0)
+
+    if isLoadFailure
+        if m.formatsToTry <> invalid and m.formatsToTry.count() > 0
+            nextFmt = m.formatsToTry[0]
+            m.status.text = "Formato '" + m.currentFormat + "' não abriu, tentando '" + nextFmt + "'..."
+            startNextAttempt()
+            return
         end if
-        m.status.text = "Playback encerrado." + errMsg + " Envie outro stream pelo celular."
+        m.status.text = "Não consegui tocar este stream (formato/codec incompatível" +
+            " ou URL inacessível pela Roku). Envie outro pelo celular."
+        m.idleScreen.visible = true
+        m.video.visible = false
+        return
+    end if
+
+    if state = "finished"
+        m.status.text = "Playback encerrado. Envie outro stream pelo celular."
         m.idleScreen.visible = true
         m.video.visible = false
     end if
