@@ -1,4 +1,5 @@
 # Android
+*.apk
 android-bridge/.gradle/
 android-bridge/build/
 android-bridge/app/build/

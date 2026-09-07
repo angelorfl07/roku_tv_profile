@@ -109,6 +109,27 @@ Depois de instalado:
 2. No Stremio, mande o stream para o Roku Cast Bridge (player externo ou
    compartilhar — ver seção acima).
 
+### IP da Roku: salvo e revalidado sozinho (desde v1.1)
+
+O IP fica persistido em `SharedPreferences` (`RokuConfig.kt`) e **não é mais
+perguntado a cada abertura**. Fluxo a cada vez que o app abre ou recebe um
+stream (`MainActivity.ensureRokuReady`):
+
+1. testa o IP salvo com um health check leve (`GET :8060/query/device-info`,
+   `RokuSender.reachable`);
+2. se respondeu, usa direto — silencioso, sem UI;
+3. se **não** respondeu (Roku trocou de IP no DHCP, mudou de rede, desligou),
+   faz uma busca SSDP na rede, salva o novo IP e segue;
+4. só mostra erro pedindo ação manual se a busca também falhar.
+
+Botão **"Esquecer IP"** limpa o valor salvo (para trocar de Roku de propósito).
+
+Todas as chamadas (ECP e SSDP) são forçadas pela rede Wi-Fi/Ethernet
+(`LocalNetwork.of` → `Network.openConnection` / `Network.bindSocket`). Sem isso,
+com dados móveis (4G/5G) ligados o Android roteava o socket pela operadora e a
+Roku ficava inalcançável — era a causa do `input=-1, launch=-1` visto em teste
+(o print mostrava 5G ativo junto com o Wi-Fi).
+
 ## Fallback sem escrever nada: Miracast nativo da Roku
 
 Enquanto o canal/app não estão prontos, ou para qualquer conteúdo que o cast

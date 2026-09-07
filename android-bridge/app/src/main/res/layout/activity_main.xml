@@ -18,11 +18,31 @@
         android:hint="192.168.0.x"
         android:inputType="text" />
 
-    <Button
-        android:id="@+id/btnDiscover"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Detectar Roku na rede" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnDiscover"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Detectar Roku na rede" />
+
+        <Button
+            android:id="@+id/btnForget"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Esquecer IP" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="O IP fica salvo. O app só procura de novo se ele parar de responder."
+        android:textSize="12sp"
+        android:alpha="0.6" />
 
     <TextView
         android:layout_width="wrap_content"

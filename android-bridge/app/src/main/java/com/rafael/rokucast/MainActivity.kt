@@ -1,7 +1,6 @@
 package com.rafael.rokucast
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -11,7 +10,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var prefs: SharedPreferences
+    private lateinit var config: RokuConfig
     private lateinit var editRokuIp: EditText
     private lateinit var editStreamUrl: EditText
     private lateinit var editTitle: EditText
@@ -23,17 +22,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        prefs = getSharedPreferences("roku_cast_bridge", MODE_PRIVATE)
+        config = RokuConfig(this)
 
         editRokuIp = findViewById(R.id.editRokuIp)
         editStreamUrl = findViewById(R.id.editStreamUrl)
         editTitle = findViewById(R.id.editTitle)
         textStatus = findViewById(R.id.textStatus)
 
-        editRokuIp.setText(prefs.getString("roku_ip", ""))
+        editRokuIp.setText(config.rokuIp)
 
         findViewById<Button>(R.id.btnDiscover).setOnClickListener { discoverRoku() }
-        findViewById<Button>(R.id.btnSend).setOnClickListener { sendToRoku() }
+        findViewById<Button>(R.id.btnForget).setOnClickListener { forgetRoku() }
+        findViewById<Button>(R.id.btnSend).setOnClickListener { onSendClicked() }
 
         handleIncomingIntent(intent)
     }
@@ -53,45 +53,144 @@ class MainActivity : AppCompatActivity() {
             else -> null
         }
 
-        if (!url.isNullOrBlank()) {
-            editStreamUrl.setText(url)
+        if (url.isNullOrBlank()) {
+            // Abertura normal do app: revalida o IP salvo em background e,
+            // se ele não responder mais, procura a Roku na rede sozinho.
+            ensureRokuReady(autoSend = false)
+            return
+        }
 
-            // "title" é o extra usado pela convenção informal de player externo
-            // (mesma que o MX Player popularizou); EXTRA_SUBJECT cobre o caso
-            // de "compartilhar" ao invés de "abrir com".
-            val title = intent.getStringExtra("title")
-                ?: intent.getStringExtra(Intent.EXTRA_SUBJECT)
-            if (!title.isNullOrBlank()) editTitle.setText(title)
+        editStreamUrl.setText(url)
 
-            // se já tiver um IP de Roku salvo, envia direto — só pede confirmação
-            // manual quando falta configurar o IP.
-            val savedIp = prefs.getString("roku_ip", "")
-            if (!savedIp.isNullOrBlank()) {
-                sendToRoku()
-            } else {
-                textStatus.text = "Stream recebido. Informe o IP da Roku e toque em Enviar."
+        // "title" é o extra usado pela convenção informal de player externo
+        // (mesma que o MX Player popularizou); EXTRA_SUBJECT cobre o caso
+        // de "compartilhar" ao invés de "abrir com".
+        val title = intent.getStringExtra("title")
+            ?: intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        if (!title.isNullOrBlank()) editTitle.setText(title)
+
+        // Fluxo automático: resolve o IP (salvo, ou redescobre) e já envia.
+        ensureRokuReady(autoSend = true)
+    }
+
+    /**
+     * Garante um IP de Roku que responde, sem incomodar o usuário:
+     *  1. usa o IP salvo/digitado se ele ainda responder na porta ECP (8060);
+     *  2. senão, faz uma busca SSDP na rede e salva o que encontrar;
+     *  3. só pede ação manual se as duas coisas falharem.
+     *
+     * Com [autoSend] = true, dispara o envio do stream assim que o IP resolver.
+     */
+    private fun ensureRokuReady(autoSend: Boolean) {
+        val candidate = editRokuIp.text.toString().trim().ifBlank { config.rokuIp }
+
+        textStatus.text = when {
+            candidate.isNotBlank() -> "Falando com a Roku em $candidate..."
+            else -> "Procurando a Roku na rede..."
+        }
+
+        executor.execute {
+            val net = LocalNetwork.of(this)
+
+            var ip = candidate
+            var ok = candidate.isNotBlank() && RokuSender.reachable(net, candidate)
+            var foundButBlocked: String? = null
+
+            if (!ok) {
+                runOnUiThread {
+                    textStatus.text = if (candidate.isBlank())
+                        "Procurando a Roku na rede..."
+                    else
+                        "O IP $candidate não respondeu. Procurando a Roku na rede..."
+                }
+                val found = SsdpDiscovery.discoverFirstRoku(net)
+                if (!found.isNullOrBlank()) {
+                    if (RokuSender.reachable(net, found)) {
+                        ip = found
+                        ok = true
+                    } else {
+                        foundButBlocked = found
+                    }
+                }
             }
+
+            val resolvedIp = ip
+            val blocked = foundButBlocked
+
+            runOnUiThread {
+                when {
+                    ok -> {
+                        config.save(resolvedIp, verified = true)
+                        editRokuIp.setText(resolvedIp)
+                        if (autoSend) {
+                            sendToRoku(resolvedIp)
+                        } else {
+                            textStatus.text = "Roku pronta em $resolvedIp. É só mandar o stream pelo Stremio."
+                        }
+                    }
+                    blocked != null -> {
+                        editRokuIp.setText(blocked)
+                        config.save(blocked, verified = false)
+                        textStatus.text = "Achei uma Roku em $blocked, mas ela não aceitou " +
+                            "controle na porta 8060. Ative em Configurações > Sistema > Controle " +
+                            "externo > \"Controle por rede\" (ou \"Permitir\")."
+                    }
+                    else -> {
+                        textStatus.text = "Não achei a Roku. Confira se ela está ligada e no mesmo " +
+                            "Wi-Fi do celular, depois toque em \"Detectar Roku na rede\" ou digite " +
+                            "o IP manualmente (na Roku: Configurações > Rede > Sobre)."
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onSendClicked() {
+        val url = editStreamUrl.text.toString().trim()
+        if (url.isBlank()) {
+            textStatus.text = "Informe a URL do stream."
+            return
+        }
+        val typed = editRokuIp.text.toString().trim()
+        if (typed.isNotBlank()) {
+            sendToRoku(typed)
+        } else {
+            ensureRokuReady(autoSend = true)
         }
     }
 
     private fun discoverRoku() {
         textStatus.text = "Procurando Roku na rede..."
         executor.execute {
-            val ip = SsdpDiscovery.discoverFirstRoku()
+            val net = LocalNetwork.of(this)
+            val ip = SsdpDiscovery.discoverFirstRoku(net)?.takeIf { it.isNotBlank() }
+            val reachable = ip != null && RokuSender.reachable(net, ip)
             runOnUiThread {
-                if (ip != null) {
-                    editRokuIp.setText(ip)
-                    textStatus.text = "Roku encontrada: $ip"
-                } else {
+                if (ip == null) {
                     textStatus.text = "Nenhuma Roku respondeu. Informe o IP manualmente " +
-                        "(Configurações > Rede > Sobre, na Roku)."
+                        "(na Roku: Configurações > Rede > Sobre)."
+                    return@runOnUiThread
+                }
+                editRokuIp.setText(ip)
+                if (reachable) {
+                    config.save(ip, verified = true)
+                    textStatus.text = "Roku encontrada e salva: $ip"
+                } else {
+                    config.save(ip, verified = false)
+                    textStatus.text = "Roku encontrada em $ip, mas a porta de controle (8060) " +
+                        "não respondeu. Ative \"Controle por rede\" na Roku."
                 }
             }
         }
     }
 
-    private fun sendToRoku() {
-        val ip = editRokuIp.text.toString().trim()
+    private fun forgetRoku() {
+        config.clear()
+        editRokuIp.setText("")
+        textStatus.text = "IP salvo apagado. Toque em \"Detectar Roku na rede\" ou digite um IP."
+    }
+
+    private fun sendToRoku(ip: String) {
         val url = editStreamUrl.text.toString().trim()
         val title = editTitle.text.toString().trim()
 
@@ -104,17 +203,23 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        prefs.edit().putString("roku_ip", ip).apply()
-        textStatus.text = "Enviando para a Roku..."
+        textStatus.text = "Enviando para a Roku ($ip)..."
 
         executor.execute {
-            val result = RokuSender.send(ip, url, title)
+            val net = LocalNetwork.of(this)
+            val result = RokuSender.send(net, ip, url, title)
             runOnUiThread {
-                textStatus.text = when (result) {
-                    is RokuSender.Result.Success ->
-                        if (result.viaInput) "Enviado (canal já estava aberto)."
-                        else "Canal lançado na Roku com o stream."
-                    is RokuSender.Result.Failure -> result.message
+                when (result) {
+                    is RokuSender.Result.Success -> {
+                        config.save(ip, verified = true)
+                        textStatus.text = if (result.viaInput)
+                            "Enviado (canal já estava aberto)."
+                        else
+                            "Canal lançado na Roku com o stream."
+                    }
+                    is RokuSender.Result.Failure -> {
+                        textStatus.text = result.message
+                    }
                 }
             }
         }

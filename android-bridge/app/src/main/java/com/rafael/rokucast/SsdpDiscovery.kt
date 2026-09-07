@@ -1,5 +1,6 @@
 package com.rafael.rokucast
 
+import android.net.Network
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -15,10 +16,19 @@ object SsdpDiscovery {
     private const val SSDP_PORT = 1900
     private const val SEARCH_TARGET = "roku:ecp"
 
-    /** Retorna o IP da primeira Roku encontrada, ou null se nenhuma responder a tempo. */
-    fun discoverFirstRoku(timeoutMs: Int = 3000): String? {
+    /**
+     * Retorna o IP da primeira Roku encontrada, ou null se nenhuma responder
+     * a tempo. Se [network] for informada, o socket é preso a ela (Wi-Fi) para
+     * o M-SEARCH não sair pela rede móvel.
+     */
+    fun discoverFirstRoku(network: Network? = null, timeoutMs: Int = 3000): String? {
         val socket = DatagramSocket()
         try {
+            try {
+                network?.bindSocket(socket)
+            } catch (e: Exception) {
+                // segue sem bind — melhor tentar pela rota padrão do que desistir
+            }
             socket.soTimeout = timeoutMs
 
             val message = "M-SEARCH * HTTP/1.1\r\n" +
