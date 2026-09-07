@@ -28,7 +28,7 @@
                    color="0x8A8A96FF" />
         </Group>
 
-        <!-- DEBUG temporário — remover depois que o playback estiver confirmado. -->
+        <!-- DEBUG temporario - remover depois que o playback estiver confirmado. -->
         <Label id="debugUrlLabel"
                text=""
                translation="[40,30]"
@@ -41,6 +41,12 @@
                width="1200"
                wrap="true"
                color="0xFFCC88FF" />
+        <Label id="debugAudioLabel"
+               text=""
+               translation="[40,320]"
+               width="1200"
+               wrap="true"
+               color="0xCC88FFFF" />
 
         <Video id="videoPlayer"
                translation="[0,0]"
