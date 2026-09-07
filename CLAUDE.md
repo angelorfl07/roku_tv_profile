@@ -59,19 +59,20 @@ Roku TV — vídeo na tela, play/pause/rev/fwd no controle remoto da própria Ro
 
 ## Como o Stremio entrega a URL para o app-ponte
 
-Esse é o ponto que precisa de teste na sua instalação específica do Stremio,
-porque não é 100% documentado publicamente:
+Confirmado: o Stremio Android usado aqui expõe "player externo". Esse é o
+caminho usado — ao tocar um stream, escolha "Roku Cast Bridge" na lista de
+players. O Android manda a URL via `ACTION_VIEW` com `mimeType=video/*`, que é
+exatamente o que o `MainActivity` já trata.
 
-1. **Se o Stremio tiver opção de "player externo"** (em Configurações do
-   player) — selecione o Roku Cast Bridge quando ele abrir o seletor de apps.
-   É o caminho mais direto: o Android manda a URL do stream via `ACTION_VIEW`.
-2. **Se não tiver**, use "Compartilhar" a partir da tela de reprodução/detalhes,
-   se o Stremio expuser essa opção para o link do stream.
-3. **Se nenhuma das duas existir no seu Stremio**, o caminho manual continua
-   funcionando: pegue a URL do stream (em geral visível nos detalhes do
-   torrent/addon, ou — mais confiável — se você usa um serviço de debrid tipo
-   Real-Debrid/AllDebrid/Premiumize, o addon geralmente expõe um link HTTP
-   direto) e cole no app Roku Cast Bridge manualmente.
+Apps de "player externo" no Android costumam seguir a convenção informal do
+MX Player, passando extras como `title` (String) e às vezes `position`/
+`headers` junto com a URL. O app já lê esse extra `title` como fallback (além
+do `EXTRA_SUBJECT` usado em compartilhamento); os demais extras não são
+necessários para o cast funcionar e foram deixados de fora por simplicidade.
+
+Se em algum momento o player externo não estiver disponível para um stream
+específico (situação rara), o caminho manual continua funcionando: copiar a
+URL do stream e colar direto no app Roku Cast Bridge.
 
 **Streams via torrent puro** (sem debrid) passam pelo servidor local do
 Stremio no celular antes de virar um link HTTP — se esse servidor só escutar
@@ -130,9 +131,8 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
 
 - [ ] Testar `send_to_roku.sh` com uma URL de vídeo simples (mp4 direto) para
       validar o canal sideloaded antes de mexer no app Android.
-- [ ] Confirmar no seu Stremio se existe opção de "player externo" ou
-      "compartilhar" para o stream ativo (isso decide se o app Android recebe
-      a URL automaticamente ou se o uso vai ser sempre manual/colar-URL).
+- [x] Confirmado: o Stremio expõe player externo — a URL chega automaticamente
+      via `ACTION_VIEW`, sem precisar copiar/colar.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
 - [ ] Testar compatibilidade de formato: HEVC/H.264, containers MKV, HLS.

@@ -55,8 +55,13 @@ class MainActivity : AppCompatActivity() {
 
         if (!url.isNullOrBlank()) {
             editStreamUrl.setText(url)
-            val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
-            if (!subject.isNullOrBlank()) editTitle.setText(subject)
+
+            // "title" é o extra usado pela convenção informal de player externo
+            // (mesma que o MX Player popularizou); EXTRA_SUBJECT cobre o caso
+            // de "compartilhar" ao invés de "abrir com".
+            val title = intent.getStringExtra("title")
+                ?: intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            if (!title.isNullOrBlank()) editTitle.setText(title)
 
             // se já tiver um IP de Roku salvo, envia direto — só pede confirmação
             // manual quando falta configurar o IP.
