@@ -30,7 +30,7 @@ sub onNewUrl()
     url = m.top.stremioUrl
 
     ' DEBUG: mostra na tela exatamente o que o canal recebeu, pra facilitar
-    ' diagnóstico enquanto testamos (remover depois que estiver tudo ok).
+    ' diagnostico enquanto testamos (remover depois que estiver tudo ok).
     if url = ""
         m.debugUrl.text = "[debug] URL recebida: (vazia)"
     else
@@ -50,19 +50,19 @@ sub playUrl(url as String, title as String)
     m.currentTitle = title
     m.backArmed = false
 
-    ' Retomar de onde parou: se a última URL salva no registro é esta mesma e
-    ' havia uma posição > 15s guardada, começa de lá. Assim, mesmo que o
-    ' usuário saia do canal (VOLTAR), recastar o mesmo stream continua.
+    ' Retomar de onde parou: se a ultima URL salva no registro e esta mesma e
+    ' havia uma posicao > 15s guardada, comeca de la. Assim, mesmo que o
+    ' usuario saia do canal (VOLTAR), recastar o mesmo stream continua.
     m.resumeFrom = 0
     if m.reg.Exists("url") and m.reg.Read("url") = url and m.reg.Exists("pos")
-        p = m.reg.Read("pos").ToInt()
-        if p > 15 then m.resumeFrom = p
+        savedPos = int(val(m.reg.Read("pos")))
+        if savedPos > 15 then m.resumeFrom = savedPos
     end if
 
-    ' Ordem de formatos a tentar. A Roku NÃO detecta container sozinha em
-    ' playback progressivo — passar o streamFormat errado dá "malformed data"
+    ' Ordem de formatos a tentar. A Roku NAO detecta container sozinha em
+    ' playback progressivo - passar o streamFormat errado da "malformed data"
     ' logo no pos=0 (ex.: "mp4" num Matroska real: o demuxer bate no header
-    ' EBML e rejeita). Então detectamos pela extensão e, se o primeiro
+    ' EBML e rejeita). Entao detectamos pela extensao e, se o primeiro
     ' formato falhar de cara, tentamos o outro automaticamente.
     if isHls(url)
         m.formatsToTry = ["hls"]
@@ -75,7 +75,7 @@ sub playUrl(url as String, title as String)
     else if hasExt(url, ".mp3")
         m.formatsToTry = ["mp3"]
     else
-        ' mp4 / m4v / mov / desconhecido — mp4 primeiro, mkv como rede de segurança
+        ' mp4 / m4v / mov / desconhecido - mp4 primeiro, mkv como rede de seguranca
         m.formatsToTry = ["mp4", "mkv"]
     end if
 
@@ -94,8 +94,7 @@ sub startNextAttempt()
     content.streamFormat = fmt
     if m.resumeFrom > 0 then content.playStart = m.resumeFrom
 
-    m.debugUrl.text = "[debug] fmt=" + fmt + " resume=" + str(m.resumeFrom).trim() +
-        " (" + str(len(m.currentUrl)).trim() + " chars): " + m.currentUrl
+    m.debugUrl.text = "[debug] fmt=" + fmt + " resume=" + str(m.resumeFrom).trim() + " (" + str(len(m.currentUrl)).trim() + " chars): " + m.currentUrl
 
     m.video.control = "stop"
     m.video.content = content
@@ -103,14 +102,14 @@ sub startNextAttempt()
     m.video.control = "play"
     m.video.setFocus(true)
 
-    m.hint.text = "▶❚❚ pausa/continua   ·   ◀◀ ▶▶ pula 30s   ·   VOLTAR pausa (2x = sai)"
+    m.hint.text = "OK / play-pause: pausa   |   << >> : pula 30s   |   VOLTAR: pausa (2x = sai)"
 end sub
 
 function isHls(url as String) as Boolean
     return instr(1, lcase(url), ".m3u8") > 0
 end function
 
-' Confere a extensão do path ignorando querystring (?a=b) e fragmento (#x).
+' Confere a extensao do path ignorando querystring (?a=b) e fragmento (#x).
 function hasExt(url as String, ext as String) as Boolean
     u = lcase(url)
     q = instr(1, u, "?")
@@ -121,7 +120,7 @@ function hasExt(url as String, ext as String) as Boolean
     return right(u, len(ext)) = lcase(ext)
 end function
 
-' Salva a posição atual no registro a cada ~5s, pra permitir retomar depois.
+' Salva a posicao atual no registro a cada ~5s, pra permitir retomar depois.
 sub onPosition()
     pos = m.video.position
     if pos <= 0 then return
@@ -143,12 +142,11 @@ end sub
 sub onVideoStateChange()
     state = m.video.state
 
-    ' DEBUG: mantém um histórico curto das últimas transições de estado (em vez
-    ' de só a última), e sempre checa errorCode/errorMsg — a Roku às vezes
-    ' preenche esses campos mesmo quando o estado "grosso" não é literalmente
-    ' "error" (ex.: cai direto pra "finished" com duração 0 numa falha de load).
-    line = state + " (pos=" + str(m.video.position).trim() +
-        " dur=" + str(m.video.duration).trim() + " fmt=" + m.currentFormat + ")"
+    ' DEBUG: mantem um historico curto das ultimas transicoes de estado (em vez
+    ' de so a ultima), e sempre checa errorCode/errorMsg - a Roku as vezes
+    ' preenche esses campos mesmo quando o estado "grosso" nao e literalmente
+    ' "error" (ex.: cai direto pra "finished" com duracao 0 numa falha de load).
+    line = state + " (pos=" + str(m.video.position).trim() + " dur=" + str(m.video.duration).trim() + " fmt=" + m.currentFormat + ")"
 
     errCode = m.video.errorCode
     errMsg = m.video.errorMsg
@@ -169,25 +167,24 @@ sub onVideoStateChange()
     m.debugState.text = full
 
     if state = "playing"
-        ' garante que o Video node tem o foco — sem isto o botão play/pause do
-        ' controle não chega no player e o usuário fica sem como pausar.
+        ' garante que o Video node tem o foco - sem isto o botao play/pause do
+        ' controle nao chega no player e o usuario fica sem como pausar.
         m.video.setFocus(true)
         m.backArmed = false
         return
     end if
 
-    ' Falha de carregamento: "error", ou "finished" sem nunca ter tido duração.
+    ' Falha de carregamento: "error", ou "finished" sem nunca ter tido duracao.
     isLoadFailure = (state = "error") or (state = "finished" and m.video.duration = 0)
 
     if isLoadFailure
         if m.formatsToTry <> invalid and m.formatsToTry.count() > 0
             nextFmt = m.formatsToTry[0]
-            m.status.text = "Formato '" + m.currentFormat + "' não abriu, tentando '" + nextFmt + "'..."
+            m.status.text = "Formato '" + m.currentFormat + "' nao abriu, tentando '" + nextFmt + "'..."
             startNextAttempt()
             return
         end if
-        m.status.text = "Não consegui tocar este stream (formato/codec incompatível" +
-            " ou URL inacessível pela Roku). Envie outro pelo celular."
+        m.status.text = "Nao consegui tocar este stream (formato/codec incompativel ou URL inacessivel pela Roku). Envie outro pelo celular."
         m.hint.text = ""
         m.idleScreen.visible = true
         m.video.visible = false
@@ -203,33 +200,33 @@ sub onVideoStateChange()
     end if
 end sub
 
-' Tratamento das teclas do controle durante o playback. O Video node em foco já
+' Tratamento das teclas do controle durante o playback. O Video node em foco ja
 ' trata play/pause/rev/fwd nativamente quando enableTrickPlay funciona; isto
-' reforça e cobre o caso do MKV progressivo, em que a Roku às vezes não liga o
+' reforca e cobre o caso do MKV progressivo, em que a Roku as vezes nao liga o
 ' trick play nativo.
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
     if m.video.visible <> true then return false
 
     if key = "back"
-        ' 1º VOLTAR: garante pausado e "arma" a saída. 2º VOLTAR: deixa sair.
+        ' 1o VOLTAR: garante pausado e "arma" a saida. 2o VOLTAR: deixa sair.
         if m.backArmed
             clearResume()
             return false
         end if
         m.video.control = "pause"
         m.backArmed = true
-        m.hint.text = "Pausado. ▶❚❚ para continuar  ·  VOLTAR de novo para sair"
+        m.hint.text = "Pausado. OK / play-pause para continuar. VOLTAR de novo para sair."
         return true
     end if
 
     if key = "play" or key = "OK"
         if m.video.control = "play"
             m.video.control = "pause"
-            m.hint.text = "Pausado. ▶❚❚ para continuar"
+            m.hint.text = "Pausado. OK / play-pause para continuar."
         else
             m.video.control = "play"
-            m.hint.text = "▶❚❚ pausa/continua   ·   ◀◀ ▶▶ pula 30s   ·   VOLTAR pausa (2x = sai)"
+            m.hint.text = "OK / play-pause: pausa   |   << >> : pula 30s   |   VOLTAR: pausa (2x = sai)"
         end if
         m.backArmed = false
         return true
