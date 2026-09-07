@@ -10,6 +10,8 @@ sub init()
     m.video.enableTrickPlay = true
     m.video.notificationInterval = 1
     m.video.observeField("state", "onVideoStateChange")
+
+    m.stateLog = []
 end sub
 
 ' disparado automaticamente quando main.brs seta scene.stremioUrl
@@ -24,6 +26,7 @@ sub onNewUrl()
         m.debugUrl.text = "[debug] URL recebida (" + str(len(url)).trim() + " chars): " + url
     end if
     m.debugState.text = ""
+    m.stateLog = []
 
     if url <> ""
         playUrl(url, m.top.stremioTitle)
@@ -59,16 +62,30 @@ end function
 sub onVideoStateChange()
     state = m.video.state
 
-    ' DEBUG: mostra o último estado reportado pelo Video node (sobrescreve,
-    ' não acumula, pra não sair da área visível da tela).
-    line = "[debug] estado: " + state +
-        " | posição: " + str(m.video.position).trim() +
-        " | duração: " + str(m.video.duration).trim()
-    if state = "error"
-        line = line + " | errorCode: " + str(m.video.errorCode).trim() +
-            " | errorMsg: " + m.video.errorMsg
+    ' DEBUG: mantém um histórico curto das últimas transições de estado (em vez
+    ' de só a última), e sempre checa errorCode/errorMsg — a Roku às vezes
+    ' preenche esses campos mesmo quando o estado "grosso" não é literalmente
+    ' "error" (ex.: cai direto pra "finished" com duração 0 numa falha de load).
+    line = state + " (pos=" + str(m.video.position).trim() +
+        " dur=" + str(m.video.duration).trim() + ")"
+
+    errCode = m.video.errorCode
+    errMsg = m.video.errorMsg
+    if errCode <> 0 or errMsg <> ""
+        line = line + " ERRO[" + str(errCode).trim() + "]: " + errMsg
     end if
-    m.debugState.text = line
+
+    if m.stateLog = invalid then m.stateLog = []
+    m.stateLog.push(line)
+    while m.stateLog.count() > 6
+        m.stateLog.shift()
+    end while
+
+    full = ""
+    for each l in m.stateLog
+        full = full + "[debug] " + l + chr(10)
+    end for
+    m.debugState.text = full
 
     if state = "finished" or state = "error"
         errMsg = ""
