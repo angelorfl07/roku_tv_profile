@@ -1,0 +1,12 @@
+# Android
+android-bridge/.gradle/
+android-bridge/build/
+android-bridge/app/build/
+android-bridge/local.properties
+android-bridge/.idea/
+android-bridge/*.iml
+
+# Roku packaging output
+stremio-cast-receiver.zip
+
+.DS_Store
