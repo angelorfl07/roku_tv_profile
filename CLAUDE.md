@@ -129,10 +129,20 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
 
 ## Status / próximos passos
 
-- [ ] Testar `send_to_roku.sh` com uma URL de vídeo simples (mp4 direto) para
-      validar o canal sideloaded antes de mexer no app Android.
+- [x] Canal Roku sideloaded validado de ponta a ponta: ECP `/launch/dev`,
+      deep link, `ContentNode`, transporte (`buffering → playing → finished`)
+      — testado com `https://www.w3schools.com/html/mov_bbb.mp4`.
+      Observação: links de `googleapis.com/commondatastorage` falharam com
+      `HTTP response error` mesmo em HTTP puro (sem TLS) — não é bug do canal,
+      parece bloqueio de rede/DNS específico pra esse domínio na rede de
+      quem testou. Sem relevância prática (o Stremio nunca vai apontar pra
+      esse domínio).
 - [x] Confirmado: o Stremio expõe player externo — a URL chega automaticamente
       via `ACTION_VIEW`, sem precisar copiar/colar.
+- [ ] Testar com uma URL **real** de stream do Stremio (não mais vídeo de
+      demonstração) — truque sem precisar do app Android ainda: no seletor
+      de "player externo" do Stremio, escolher o Chrome; a URL aparece na
+      barra de endereço e pode ser copiada de lá pro `send_to_roku.sh`.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
 - [ ] Testar compatibilidade de formato: HEVC/H.264, containers MKV, HLS.
