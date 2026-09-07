@@ -92,54 +92,57 @@ class MainActivity : AppCompatActivity() {
         executor.execute {
             val net = LocalNetwork.of(this)
 
-            var ip = candidate
-            var ok = candidate.isNotBlank() && RokuSender.reachable(net, candidate)
-            var foundButBlocked: String? = null
+            // 1. IP salvo/digitado que já responde ao health check → caminho feliz.
+            var ip: String? = candidate.takeIf {
+                it.isNotBlank() && RokuSender.reachable(net, it)
+            }
+            var verified = ip != null
 
-            if (!ok) {
+            // 2. senão, busca SSDP na rede.
+            if (ip == null) {
                 runOnUiThread {
                     textStatus.text = if (candidate.isBlank())
                         "Procurando a Roku na rede..."
                     else
-                        "O IP $candidate não respondeu. Procurando a Roku na rede..."
+                        "O IP $candidate não respondeu ao teste. Procurando a Roku na rede..."
                 }
-                val found = SsdpDiscovery.discoverFirstRoku(net)
-                if (!found.isNullOrBlank()) {
-                    if (RokuSender.reachable(net, found)) {
-                        ip = found
-                        ok = true
-                    } else {
-                        foundButBlocked = found
-                    }
+                val found = SsdpDiscovery.discoverFirstRoku(net)?.takeIf { it.isNotBlank() }
+                if (found != null) {
+                    ip = found
+                    verified = RokuSender.reachable(net, found)
                 }
             }
 
+            // 3. último recurso: nada respondeu ao health check, mas temos um
+            //    palpite (IP salvo/digitado) — tenta com ele mesmo assim; quem
+            //    dá o veredito final é o POST do ECP, não o health check (que
+            //    pode ser falso-negativo dependendo da config da Roku).
+            if (ip == null && candidate.isNotBlank()) {
+                ip = candidate
+                verified = false
+            }
+
             val resolvedIp = ip
-            val blocked = foundButBlocked
+            val isVerified = verified
 
             runOnUiThread {
+                if (resolvedIp == null) {
+                    textStatus.text = "Não achei a Roku. Confira se ela está ligada e no mesmo " +
+                        "Wi-Fi do celular (não numa rede de convidados), depois toque em " +
+                        "\"Detectar Roku na rede\" ou digite o IP manualmente."
+                    return@runOnUiThread
+                }
+
+                config.save(resolvedIp, verified = isVerified)
+                editRokuIp.setText(resolvedIp)
+
                 when {
-                    ok -> {
-                        config.save(resolvedIp, verified = true)
-                        editRokuIp.setText(resolvedIp)
-                        if (autoSend) {
-                            sendToRoku(resolvedIp)
-                        } else {
-                            textStatus.text = "Roku pronta em $resolvedIp. É só mandar o stream pelo Stremio."
-                        }
-                    }
-                    blocked != null -> {
-                        editRokuIp.setText(blocked)
-                        config.save(blocked, verified = false)
-                        textStatus.text = "Achei uma Roku em $blocked, mas ela não aceitou " +
-                            "controle na porta 8060. Ative em Configurações > Sistema > Controle " +
-                            "externo > \"Controle por rede\" (ou \"Permitir\")."
-                    }
-                    else -> {
-                        textStatus.text = "Não achei a Roku. Confira se ela está ligada e no mesmo " +
-                            "Wi-Fi do celular, depois toque em \"Detectar Roku na rede\" ou digite " +
-                            "o IP manualmente (na Roku: Configurações > Rede > Sobre)."
-                    }
+                    autoSend -> sendToRoku(resolvedIp)
+                    isVerified -> textStatus.text =
+                        "Roku pronta em $resolvedIp. É só mandar o stream pelo Stremio."
+                    else -> textStatus.text = "Roku em $resolvedIp encontrada, mas ela não " +
+                        "respondeu ao teste na porta 8060 — vou tentar assim mesmo quando você " +
+                        "mandar um stream. Se falhar, veja \"Controle por rede\" na Roku."
                 }
             }
         }
@@ -172,13 +175,12 @@ class MainActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 editRokuIp.setText(ip)
-                if (reachable) {
-                    config.save(ip, verified = true)
-                    textStatus.text = "Roku encontrada e salva: $ip"
+                config.save(ip, verified = reachable)
+                textStatus.text = if (reachable) {
+                    "Roku encontrada e salva: $ip"
                 } else {
-                    config.save(ip, verified = false)
-                    textStatus.text = "Roku encontrada em $ip, mas a porta de controle (8060) " +
-                        "não respondeu. Ative \"Controle por rede\" na Roku."
+                    "Roku encontrada e salva: $ip (não respondeu ao teste na porta 8060, mas " +
+                        "vou tentar mesmo assim ao enviar; se falhar, veja \"Controle por rede\" na Roku)."
                 }
             }
         }
