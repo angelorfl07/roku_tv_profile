@@ -13,6 +13,12 @@
                translation="[120,340]"
                width="1040"
                color="0xCCCCCCFF" />
+        <Label id="debugLabel"
+               text=""
+               translation="[40,620]"
+               width="1200"
+               wrap="true"
+               color="0x88CCFFFF" />
         <Video id="videoPlayer"
                translation="[0,0]"
                width="1280"

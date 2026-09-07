@@ -3,6 +3,7 @@ sub init()
 
     m.video = m.top.findNode("videoPlayer")
     m.status = m.top.findNode("statusLabel")
+    m.debug = m.top.findNode("debugLabel")
 
     m.video.enableTrickPlay = true
     m.video.notificationInterval = 1
@@ -12,6 +13,15 @@ end sub
 ' disparado automaticamente quando main.brs seta scene.stremioUrl
 sub onNewUrl()
     url = m.top.stremioUrl
+
+    ' DEBUG: mostra na tela exatamente o que o canal recebeu, pra facilitar
+    ' diagnóstico enquanto testamos (remover depois que estiver tudo ok).
+    if url = ""
+        m.debug.text = "[debug] URL recebida: (vazia)"
+    else
+        m.debug.text = "[debug] URL recebida (" + str(len(url)).trim() + " chars): " + url
+    end if
+
     if url <> ""
         playUrl(url, m.top.stremioTitle)
     end if
@@ -45,6 +55,16 @@ end function
 
 sub onVideoStateChange()
     state = m.video.state
+
+    ' DEBUG: acrescenta o estado/posição/erro reportado pelo Video node —
+    ' ajuda a diferenciar "nunca conseguiu abrir a URL" de "abriu e travou".
+    m.debug.text = m.debug.text + chr(10) + "[debug] estado: " + state +
+        " | posição: " + str(m.video.position).trim() +
+        " | duração: " + str(m.video.duration).trim()
+    if state = "error"
+        m.debug.text = m.debug.text + " | errorCode: " + str(m.video.errorCode).trim() +
+            " | errorMsg: " + m.video.errorMsg
+    end if
 
     if state = "finished" or state = "error"
         errMsg = ""
