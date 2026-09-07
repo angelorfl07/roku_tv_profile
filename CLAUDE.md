@@ -184,15 +184,32 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
       declarado errado). Corrigido no `build_version=2`: detecção de
       `streamFormat` por extensão (`.mkv/.mka→mkv`, `.mpd→dash`, `.ts→ts`,
       `.m3u8→hls`, senão `mp4`) + fallback automático `mkv↔mp4` se o primeiro
-      falhar no load. **Falta reconfirmar o playback com o canal v2.**
+      falhar no load. **`build_version=2` confirmou: vídeo tocou.**
       Nota: a URL do Stremio (`play.dnshtp.com`) responde **302** para um
       `http://<ip>:<porta>` cru — a Roku OS 15.x segue esse redirect em
       playback progressivo sem problema (o destino serve `Accept-Ranges` +
       `Content-Type` corretos); se algum stream futuro falhar só por causa de
       redirect, aí sim resolver o `Location` num Task node antes de tocar.
+- [x] `build_version=3`: pause/seek + retomar. O vídeo tocava mas (a) o botão
+      play/pause do controle não pausava — o Video node não estava com foco
+      após o load do MKV progressivo (Roku às vezes não liga o trick play
+      nativo pra MKV); resolvido reassumindo `setFocus(true)` no estado
+      `playing` + handlers de tecla no `onKeyEvent` (REW/FF 30s com clamp,
+      VOLTAR pausa/2x sai). (b) sair do canal recomeçava do zero; agora a
+      posição é salva no `roRegistrySection "resume"` a cada ~5s com a URL, e
+      recastar o MESMO stream continua de onde parou (`content.playStart`).
+- [x] Áudio: release só tinha faixas **E-AC3 (Dolby Digital Plus)**, e a Roku
+      Express 3960BR **não decodifica Dolby** (só pass-through). Sem som até
+      pôr *Configurações > Áudio > Modo de áudio = **Estéreo*** (força o
+      downmix). Formato preferencial de streaming: **Dolby (auto)**, nunca
+      DTS — nenhuma Roku Express decodifica DTS. Releases só-DTS ou só-DD+ em
+      Roku básica dependem da TV decodificar o bitstream; o caminho robusto é
+      escolher no Stremio um release com **AAC/AC3 estéreo**.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
-- [ ] Testar mais formatos: HEVC, HLS (`.m3u8`), DASH.
+- [ ] Testar mais formatos: HEVC, HLS (`.m3u8`), DASH. Confirmar se o seek
+      funciona de fato no MKV progressivo desta Roku (trick play de MKV é
+      historicamente limitado; pode não pegar sem índice Cues no começo).
 - [x] Compilar o `android-bridge/` — CI em `.github/workflows/build-apk.yml`
       gera o `app-debug.apk` a cada push que mexe em `android-bridge/`.
 - [ ] **Sideload do canal na Roku de produção (Roku Express 3960BR, "Roku Casa",
