@@ -167,5 +167,16 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
 - [ ] Validar se as URLs que você usa (torrent puro vs. debrid) são acessíveis
       pela Roku na rede local.
 - [ ] Testar compatibilidade de formato: HEVC/H.264, containers MKV, HLS.
-- [ ] Compilar o `android-bridge/` no Android Studio e testar em dispositivo
-      físico.
+- [x] Compilar o `android-bridge/` — CI em `.github/workflows/build-apk.yml`
+      gera o `app-debug.apk` a cada push que mexe em `android-bridge/`.
+- [ ] **Sideload do canal na Roku de produção (Roku Express 3960BR, "Roku Casa",
+      IP 10.0.0.5).** Em 2026-09-07 o `/query/device-info` dela mostrou
+      `developer-enabled=true` mas `keyed-developer-id` **vazio** e o
+      `/query/apps` sem `id="dev"` — ou seja, o Developer Mode está ligado
+      porém o `.zip` do canal nunca foi enviado pra ESTA Roku (o "[x] validado
+      de ponta a ponta" acima foi noutra Roku/sessão). O app Android estava
+      dando "não consegui falar com a Roku" por causa disso, não por rede: o
+      GET `:8060/query/device-info` respondia normal do próprio celular.
+      Enviar via `http://10.0.0.5` (Application Installer, usuário `rokudev`).
+      A partir da v1.3 o app distingue essa situação e mostra "canal NÃO está
+      instalado" com o passo do sideload.
