@@ -47,5 +47,12 @@
                width="1280"
                height="720"
                visible="false" />
+
+        <Label id="hintLabel"
+               text=""
+               translation="[40,670]"
+               width="1200"
+               horizAlign="center"
+               color="0xAAAAAACC" />
     </children>
 </component>

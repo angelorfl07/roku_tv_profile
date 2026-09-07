@@ -4,18 +4,25 @@ sub init()
     m.video = m.top.findNode("videoPlayer")
     m.idleScreen = m.top.findNode("idleScreen")
     m.status = m.top.findNode("statusLabel")
+    m.hint = m.top.findNode("hintLabel")
     m.debugUrl = m.top.findNode("debugUrlLabel")
     m.debugState = m.top.findNode("debugStateLabel")
 
     m.video.enableTrickPlay = true
     m.video.notificationInterval = 1
     m.video.observeField("state", "onVideoStateChange")
+    m.video.observeField("position", "onPosition")
 
     m.stateLog = []
     m.formatsToTry = []
     m.currentFormat = ""
     m.currentUrl = ""
     m.currentTitle = ""
+    m.resumeFrom = 0
+    m.lastSavedPos = 0
+    m.backArmed = false
+
+    m.reg = CreateObject("roRegistrySection", "resume")
 end sub
 
 ' disparado automaticamente quando main.brs seta scene.stremioUrl
@@ -41,6 +48,16 @@ sub playUrl(url as String, title as String)
     m.idleScreen.visible = false
     m.currentUrl = url
     m.currentTitle = title
+    m.backArmed = false
+
+    ' Retomar de onde parou: se a última URL salva no registro é esta mesma e
+    ' havia uma posição > 15s guardada, começa de lá. Assim, mesmo que o
+    ' usuário saia do canal (VOLTAR), recastar o mesmo stream continua.
+    m.resumeFrom = 0
+    if m.reg.Exists("url") and m.reg.Read("url") = url and m.reg.Exists("pos")
+        p = m.reg.Read("pos").ToInt()
+        if p > 15 then m.resumeFrom = p
+    end if
 
     ' Ordem de formatos a tentar. A Roku NÃO detecta container sozinha em
     ' playback progressivo — passar o streamFormat errado dá "malformed data"
@@ -75,14 +92,18 @@ sub startNextAttempt()
     content.url = m.currentUrl
     content.title = m.currentTitle
     content.streamFormat = fmt
+    if m.resumeFrom > 0 then content.playStart = m.resumeFrom
 
-    m.debugUrl.text = "[debug] fmt=" + fmt + " (" + str(len(m.currentUrl)).trim() + " chars): " + m.currentUrl
+    m.debugUrl.text = "[debug] fmt=" + fmt + " resume=" + str(m.resumeFrom).trim() +
+        " (" + str(len(m.currentUrl)).trim() + " chars): " + m.currentUrl
 
     m.video.control = "stop"
     m.video.content = content
     m.video.visible = true
     m.video.control = "play"
     m.video.setFocus(true)
+
+    m.hint.text = "▶❚❚ pausa/continua   ·   ◀◀ ▶▶ pula 30s   ·   VOLTAR pausa (2x = sai)"
 end sub
 
 function isHls(url as String) as Boolean
@@ -99,6 +120,25 @@ function hasExt(url as String, ext as String) as Boolean
     if len(u) < len(ext) then return false
     return right(u, len(ext)) = lcase(ext)
 end function
+
+' Salva a posição atual no registro a cada ~5s, pra permitir retomar depois.
+sub onPosition()
+    pos = m.video.position
+    if pos <= 0 then return
+    if pos - m.lastSavedPos < 5 and pos > m.lastSavedPos then return
+
+    m.lastSavedPos = pos
+    m.reg.Write("url", m.currentUrl)
+    m.reg.Write("pos", str(pos).trim())
+    m.reg.Flush()
+end sub
+
+sub clearResume()
+    m.reg.Delete("url")
+    m.reg.Delete("pos")
+    m.reg.Flush()
+    m.lastSavedPos = 0
+end sub
 
 sub onVideoStateChange()
     state = m.video.state
@@ -128,6 +168,14 @@ sub onVideoStateChange()
     end for
     m.debugState.text = full
 
+    if state = "playing"
+        ' garante que o Video node tem o foco — sem isto o botão play/pause do
+        ' controle não chega no player e o usuário fica sem como pausar.
+        m.video.setFocus(true)
+        m.backArmed = false
+        return
+    end if
+
     ' Falha de carregamento: "error", ou "finished" sem nunca ter tido duração.
     isLoadFailure = (state = "error") or (state = "finished" and m.video.duration = 0)
 
@@ -140,37 +188,60 @@ sub onVideoStateChange()
         end if
         m.status.text = "Não consegui tocar este stream (formato/codec incompatível" +
             " ou URL inacessível pela Roku). Envie outro pelo celular."
+        m.hint.text = ""
         m.idleScreen.visible = true
         m.video.visible = false
         return
     end if
 
     if state = "finished"
+        clearResume()
         m.status.text = "Playback encerrado. Envie outro stream pelo celular."
+        m.hint.text = ""
         m.idleScreen.visible = true
         m.video.visible = false
     end if
 end sub
 
-' Tratamento explícito das teclas do controle remoto (reforça o comportamento
-' padrão do Video node, que já trata play/pause/rev/fwd automaticamente quando
-' está em foco — isto é um fallback para garantir consistência entre modelos).
+' Tratamento das teclas do controle durante o playback. O Video node em foco já
+' trata play/pause/rev/fwd nativamente quando enableTrickPlay funciona; isto
+' reforça e cobre o caso do MKV progressivo, em que a Roku às vezes não liga o
+' trick play nativo.
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
     if m.video.visible <> true then return false
 
-    if key = "play"
+    if key = "back"
+        ' 1º VOLTAR: garante pausado e "arma" a saída. 2º VOLTAR: deixa sair.
+        if m.backArmed
+            clearResume()
+            return false
+        end if
+        m.video.control = "pause"
+        m.backArmed = true
+        m.hint.text = "Pausado. ▶❚❚ para continuar  ·  VOLTAR de novo para sair"
+        return true
+    end if
+
+    if key = "play" or key = "OK"
         if m.video.control = "play"
             m.video.control = "pause"
+            m.hint.text = "Pausado. ▶❚❚ para continuar"
         else
             m.video.control = "play"
+            m.hint.text = "▶❚❚ pausa/continua   ·   ◀◀ ▶▶ pula 30s   ·   VOLTAR pausa (2x = sai)"
         end if
+        m.backArmed = false
         return true
     else if key = "rewind"
-        m.video.seek = m.video.position - 10
+        target = m.video.position - 30
+        if target < 0 then target = 0
+        m.video.seek = target
         return true
     else if key = "fastforward"
-        m.video.seek = m.video.position + 10
+        target = m.video.position + 30
+        if m.video.duration > 0 and target > m.video.duration - 5 then target = m.video.duration - 5
+        m.video.seek = target
         return true
     end if
 
