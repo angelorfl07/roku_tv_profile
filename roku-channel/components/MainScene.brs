@@ -260,13 +260,25 @@ sub onVideoStateChange()
     isLoadFailure = (state = "error") or (state = "finished" and m.video.duration = 0)
 
     if isLoadFailure
-        if m.formatsToTry <> invalid and m.formatsToTry.count() > 0
+        ' errCode -5 = "malformed data" (container/formato errado) -> vale tentar
+        ' o formato alternativo. errCode -1/-2/-3 = erro de HTTP/rede -> os bytes
+        ' nem chegaram; trocar de container nao ajuda, corta o retry.
+        httpOrNet = (errCode = -1 or errCode = -2 or errCode = -3)
+
+        if not httpOrNet and m.formatsToTry <> invalid and m.formatsToTry.count() > 0
             nextFmt = m.formatsToTry[0]
             m.status.text = "Formato '" + m.currentFormat + "' nao abriu, tentando '" + nextFmt + "'..."
             startNextAttempt()
             return
         end if
-        m.status.text = "Nao consegui tocar este stream (formato/codec incompativel ou URL inacessivel pela Roku). Envie outro pelo celular."
+
+        if httpOrNet
+            m.status.text = "O servidor do stream retornou erro (fora do ar, no limite de conexoes da sua conta, ou link expirado). Escolha OUTRA fonte no Stremio - de preferencia debrid."
+        else if errCode = -5
+            m.status.text = "Formato/container incompativel com a Roku (nem 'mkv' nem 'mp4' abriram). Tente outra fonte no Stremio, ou HLS/.m3u8."
+        else
+            m.status.text = "Nao consegui tocar este stream. Envie outro pelo celular."
+        end if
         m.hint.text = ""
         m.idleScreen.visible = true
         m.video.visible = false
