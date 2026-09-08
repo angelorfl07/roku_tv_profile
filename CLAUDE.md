@@ -162,6 +162,19 @@ só que com mais lag/qualidade menor e o celular precisa ficar ativo.
 
 ## Status / próximos passos
 
+- [x] **FLUXO COMPLETO FUNCIONANDO (2026-09-07):** Stremio (player externo) →
+      app Android (v1.4) → ECP → canal Roku (`build_version=5`) → vídeo tocando
+      na TV, com uma fonte IPTV que estava no ar. Restrições conhecidas, todas
+      do lado da fonte / hardware, nenhuma do código:
+      - **Áudio:** precisa de release com faixa **AAC ou AC3 estéreo** (a Roku
+        Express 3960 não decodifica Dolby/DTS). Releases só-E-AC3 tocam mudos.
+      - **Seek (avançar/voltar):** só com fontes **HLS (`.m3u8`)** ou **debrid**.
+        MKV progressivo de painel Xtream: pause funciona, pular não.
+      - **Fonte fora do ar:** `ERRO[-1]` = servidor do IPTV com 502/503 ou
+        conta no limite de conexões → trocar de fonte no Stremio.
+- [ ] Limpar os `Label` de debug (`debugUrlLabel`/`debugStateLabel`/
+      `debugAudioLabel`) da `MainScene.xml`/`.brs` agora que o playback está
+      confirmado — hoje ficam sobrepostos ao vídeo.
 - [x] Canal Roku sideloaded validado de ponta a ponta: ECP `/launch/dev`,
       deep link, `ContentNode`, transporte (`buffering → playing → finished`)
       — testado com `https://www.w3schools.com/html/mov_bbb.mp4`.
